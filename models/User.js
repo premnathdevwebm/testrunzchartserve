@@ -1,12 +1,13 @@
 const mongoose = require("mongoose");
 const { Schema } = mongoose;
 
-//const data = require("../seed/users.json")
-
 const UserSchema = new Schema({
   name: {
     type: String,
     required: true,
+  },
+  userCounter: {
+    type: String,
   },
   email: {
     type: String,
@@ -20,6 +21,12 @@ const UserSchema = new Schema({
   },
   role: {
     type: String,
+  },
+  organization: {
+    type: Schema.Types.Mixed,
+  },
+  department: {
+    type: Schema.Types.Mixed,
   },
   chartIds: [
     {

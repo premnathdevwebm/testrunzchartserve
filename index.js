@@ -35,7 +35,7 @@ function bootstrap() {
 db()
   .then(async () => {
     bootstrap();
-    //await connectMessageQue();
+    await connectMessageQue();
   })
   .catch((err) => {
     console.error(err);

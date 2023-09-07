@@ -52,17 +52,30 @@ async function connectMessageQue() {
     channel.consume(process.env.RABBIT_MQ_CHART, async (msg) => {
       if (msg !== null) {
         const data = JSON.parse(msg.content.toString());
-        const user = await User.findOne({ userId: data.id, email: data.email });
-        if (!user) {
-          const newUser = new User({
+        if (!data.type) {
+        await User.findOneAndUpdate(
+          { userId: data.id, email: data.email },
+          {
             userId: data.id,
+            userCounter: data.counter,
             name: data.name,
             email: data.email,
             role: data.role,
-          });
-          newUser.save();
-        }
+            organization: data.organization,
+            department: [data.department],
+          },
+          { upsert: true, new: true }
+        );
         channel.ack(msg);
+        }
+        if (data.type === "createuser") {
+          const { type, ...remaining } = data;
+          await User.create({ ...remaining });
+          channel.ack(msg);
+        }
+        if (data.type === "removeuser") {
+          channel.ack(msg);
+        }
       } else {
         console.log("Consumer cancelled by server");
       }
