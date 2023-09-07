@@ -16,7 +16,6 @@ const startConnect = async (runzid) => {
 const closeConnect = (runzid)=>{
   connectedClients.delete(runzid);
 }
-
 const createChart = async (req, res, next) => {
   try {
     const {runzId} = req.body
