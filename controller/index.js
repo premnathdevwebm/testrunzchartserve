@@ -8,6 +8,11 @@ const createChart = async (req, res) => {
   try {
     // const { client, database } = await influxDb();
     if (wssInstance) {
+
+      wssInstance.on('connection', (ws) => {
+        
+      });
+
       res.status(200).json({ error: "Connection  established" });
     } else {
       res.status(500).json({ error: "Connection not established" });
