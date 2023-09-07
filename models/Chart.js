@@ -4,7 +4,6 @@ const { Schema } = mongoose;
 const ChartSchema = new Schema(
   {
     runzId: String,
-    type: String,
     startTime: String,
     endTime: String,
   }
