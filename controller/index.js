@@ -31,6 +31,15 @@ const createChart = async (req, res) => {
     return res.status(500).json({ error: "Server error. Please try again" });
   }
 };
+const pauseChart = async ()=>{
+  try {
+    
+    return res.status(200).json({});
+  } catch (error) {
+    return res.status(500).json({ error: "Server error. Please try again" });
+  }
+
+}
 const listCharts = async (req, res) => {
   try {
     let temp = await User.findOne({ userId: req.user.userId }).lean();
@@ -40,6 +49,14 @@ const listCharts = async (req, res) => {
     return res.status(500).json({ error: "Server error. Please try again" });
   }
 };
+const realTimeChart = async ()=>{
+  try {
+    
+    return res.status(200).json({});
+  } catch (error) {
+    return res.status(500).json({ error: "Server error. Please try again" });
+  }
+}
 const readInflux = async (req, res) => {
   try {
    /*  const { client, org, bucket } = await influxDb();
@@ -69,6 +86,8 @@ const readInflux = async (req, res) => {
 };
 module.exports = {
   createChart,
+  pauseChart,
   listCharts,
+  realTimeChart,
   readInflux,
 };
