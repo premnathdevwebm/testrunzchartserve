@@ -4,7 +4,7 @@ const Chart = require("../models/Chart");
 const { influxDb } = require("../config");
 const createChart = async (req, res) => {
   try {
-   /*  const { client, org, bucket } = await influxDb();
+   /*  const { client, database } = await influxDb();
     const chart = new Chart({ ...req.body });
     let temp = await chart.save();
     temp = await User.findOneAndUpdate(
