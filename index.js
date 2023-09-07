@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const compression = require("compression");
 const cors = require("cors");
+const WebSocket = require("ws");
 
 const router = require("./routes");
 const { db, connectMessageQue } = require("./config");
@@ -27,16 +28,21 @@ function bootstrap() {
     res.send("The endpoint you are trying to reach does not exist.");
   });
 
-  app.listen(process.env.PORT, () => {
+  const server = app.listen(process.env.PORT, () => {
     console.log(`Chart Service running on ${process.env.PORT}`);
   });
+  const wss = new WebSocket.Server({ server });
+  return wss;
 }
 
-db()
+const wssInstance = db()
   .then(async () => {
-    bootstrap();
+    const wss = bootstrap();
     await connectMessageQue();
+    return wss;
   })
   .catch((err) => {
     console.error(err);
   });
+
+module.exports = wssInstance;
