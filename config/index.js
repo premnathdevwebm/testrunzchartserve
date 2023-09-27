@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const { createClient } = require("redis");
 const amqp = require("amqplib");
-const { InfluxDBClient } = require("@influxdata/influxdb3-client");
+const { InfluxDB } = require("@influxdata/influxdb-client");
 
 const User = require("../models/User");
 
@@ -10,13 +10,20 @@ let channel, connection;
 mongoose.set("strictQuery", false);
 
 async function influxDb() {
-  const token = process.env.INFLUXDB_TOKEN;
-  const database = process.env.INFLUXbucketdatabase;
-  const client = new InfluxDBClient({ host: process.env.INFLUXURL, token: token });
-  return new Promise((resolve, reject) => {
-    resolve({ client, database });
-    reject(new Error("Error connecting to InfluxDB"));
+  const org = process.env.influx_org;
+  const bucket = process.env.influx_bucket;
+  const client = new InfluxDB({
+    url: process.env.influx_url,
+    token: process.env.influx_token,
   });
+  try {
+    return new Promise((resolve, reject) => {
+      resolve({ client, org, bucket });
+      reject(new Error("Error connecting to InfluxDB"));
+    });
+  } catch (error) {
+    throw new Error(`Error connecting to InfluxDB: ${error.message}`);
+  }
 }
 
 async function db() {
@@ -53,20 +60,20 @@ async function connectMessageQue() {
       if (msg !== null) {
         const data = JSON.parse(msg.content.toString());
         if (!data.type) {
-        await User.findOneAndUpdate(
-          { userId: data.id, email: data.email },
-          {
-            userId: data.id,
-            userCounter: data.counter,
-            name: data.name,
-            email: data.email,
-            role: data.role,
-            organization: data.organization,
-            department: [data.department],
-          },
-          { upsert: true, new: true }
-        );
-        channel.ack(msg);
+          await User.findOneAndUpdate(
+            { userId: data.id, email: data.email },
+            {
+              userId: data.id,
+              userCounter: data.counter,
+              name: data.name,
+              email: data.email,
+              role: data.role,
+              organization: data.organization,
+              department: [data.department],
+            },
+            { upsert: true, new: true }
+          );
+          channel.ack(msg);
         }
         if (data.type === "createuser") {
           const { type, ...remaining } = data;
