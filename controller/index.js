@@ -34,7 +34,6 @@ const startConnect = async (runzid, valuesHeaders) => {
       .tag("example", "write.ts")
       .floatField("value", 20 + Math.round(100 * Math.random()) / 10);
     writeApi.writePoint(point1);
-   
       await writeApi.close();
       console.log("FINISHED ... now try ./query.ts");
       const queryApi = client.getQueryApi(org);
