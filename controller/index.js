@@ -25,6 +25,7 @@ async function writeDataToInflux(client, database, runzid, headers) {
 const startConnect = async (runzid, valuesHeaders) => {
   await WebSocket.wssInstancePromise;
   const wss = await WebSocket.wssInstancePromise;
+  try {
   wss.on("connection", async (ws) => {
     connectedClients.set(runzid, ws);
     const { client, org, bucket } = await influxDb();
@@ -33,7 +34,7 @@ const startConnect = async (runzid, valuesHeaders) => {
       .tag("example", "write.ts")
       .floatField("value", 20 + Math.round(100 * Math.random()) / 10);
     writeApi.writePoint(point1);
-    try {
+   
       await writeApi.close();
       console.log("FINISHED ... now try ./query.ts");
       const queryApi = client.getQueryApi(org);
@@ -46,18 +47,19 @@ const startConnect = async (runzid, valuesHeaders) => {
           `${o._time} ${o._measurement} in '${o.location}' (${o.example}): ${o._field}=${o._value}`
         )
       }
-    } catch (e) {
-      console.error(e);
-      if (e instanceof HttpError && e.statusCode === 401) {
-        console.log("Run ./onboarding.js to setup a new InfluxDB database.");
-      }
-      console.log("\nFinished ERROR");
-    }
+   
     /*  const intervalId = setInterval(async () => {
       await writeDataToInflux(client, database, runzid, valuesHeaders);
     }, 5000);
     intervals.set(runzid, intervalId); */
   });
+} catch (e) {
+  console.error(e);
+  if (e instanceof HttpError && e.statusCode === 401) {
+    console.log("Run ./onboarding.js to setup a new InfluxDB database.");
+  }
+  console.log("\nFinished ERROR");
+}
 };
 
 const closeConnect = (runzid) => {
