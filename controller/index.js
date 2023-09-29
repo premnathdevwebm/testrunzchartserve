@@ -64,7 +64,6 @@ const closeConnect = (runzid) => {
 const createChart = async (req, res) => {
   try {
     const { runzId, values } = req.body;
-    console.log(runzId, values);
     await startConnect(runzId, values);
     return res.status(200).json({ message: "Data streaming started" });
   } catch (error) {
