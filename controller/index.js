@@ -6,59 +6,51 @@ const WebSocket = require("../index");
 const connectedClients = new Map();
 const intervals = new Map();
 
-async function writeDataToInflux(client, database, runzid, headers) {
-  /* headers.map(async (ele) => {
-    const point = new Point();
-    const pointTemplate = Object.freeze(
-      point.measurement("stat").tag("unit", ele)
-    );
-
-    const p2 = pointTemplate
-      .floatField("avg", 24.5)
-      .floatField("max", 45.0);
-
-    await client.write(p2, database);
+async function writeDataToInflux(client, org, bucket, runzid, headers) {
+  headers.map(async (ele) => {
+    const writeApi = client.getWriteApi(org, bucket);
+    const point1 = new Point(runzid)
+      .tag("title", ele)
+      .floatField("value", 20 + Math.round(100 * Math.random()) / 10);
+    writeApi.writePoint(point1);
+    await writeApi.close();
   });
-  closeConnect(runzid); */
 }
 
 const startConnect = async (runzid, valuesHeaders) => {
   await WebSocket.wssInstancePromise;
   const wss = await WebSocket.wssInstancePromise;
+  const { client, org, bucket } = await influxDb();
   try {
-  wss.on("connection", async (ws) => {
-    connectedClients.set(runzid, ws);
-    const { client, org, bucket } = await influxDb();
-    const writeApi = client.getWriteApi(org, bucket);
-    const point1 = new Point("temperature")
-      .tag("example", "write.ts")
-      .floatField("value", 20 + Math.round(100 * Math.random()) / 10);
-    writeApi.writePoint(point1);
-      await writeApi.close();
-      console.log("FINISHED ... now try ./query.ts");
-      const queryApi = client.getQueryApi(org);
-      const fluxQuery = `from(bucket:"my-bucket") |> range(start: -1d) |> filter(fn: (r) => r._measurement == "temperature")`;
-      for await (const { values, tableMeta } of queryApi.iterateRows(
-        fluxQuery
-      )) {
-        const o = tableMeta.toObject(values)
-        ws.send(
-          `${o._time} ${o._measurement} in '${o.location}' (${o.example}): ${o._field}=${o._value}`
-        )
-      }
-   
-    /*  const intervalId = setInterval(async () => {
-      await writeDataToInflux(client, database, runzid, valuesHeaders);
-    }, 5000);
-    intervals.set(runzid, intervalId); */
-  });
-} catch (e) {
-  console.error(e);
-  if (e instanceof HttpError && e.statusCode === 401) {
-    console.log("Run ./onboarding.js to setup a new InfluxDB database.");
+    wss.on("connection", async (ws) => {
+      connectedClients.set(runzid, ws);
+      const intervalId = setInterval(async () => {
+        await writeDataToInflux(client, org, bucket, runzid, valuesHeaders);
+        const queryApi = client.getQueryApi(org);
+        const fluxQuery = `from(bucket:"my-bucket") |> range(start: -1d)|> last()`;
+        queryApi.queryRows(fluxQuery, {
+          next(row, tableMeta) {
+            const o = tableMeta.toObject(row);
+            ws.send(JSON.stringify(o, null, 2));
+          },
+          error(error) {
+            console.error(error);
+            console.log('\\nFinished ERROR');
+          },
+          complete() {
+            console.log('\\nFinished SUCCESS');
+          },
+        });
+      }, 6000);
+      intervals.set(runzid, intervalId);
+    });
+  } catch (e) {
+    console.error(e);
+    if (e instanceof HttpError && e.statusCode === 401) {
+      console.log("Run ./onboarding.js to setup a new InfluxDB database.");
+    }
+    console.log("\nFinished ERROR");
   }
-  console.log("\nFinished ERROR");
-}
 };
 
 const closeConnect = (runzid) => {
@@ -69,9 +61,10 @@ const closeConnect = (runzid) => {
   connectedClients.delete(runzid);
 };
 
-const createChart = async (req, res, next) => {
+const createChart = async (req, res) => {
   try {
     const { runzId, values } = req.body;
+    console.log(runzId, values);
     await startConnect(runzId, values);
     return res.status(200).json({ message: "Data streaming started" });
   } catch (error) {
@@ -79,6 +72,18 @@ const createChart = async (req, res, next) => {
     return res.status(500).json({ error: "Server error. Please try again" });
   }
 };
+
+const closeRunzChart = async(req, res)=>{
+  try {
+    const { runzId } = req.params;
+    closeConnect(runzId)
+    return res.status(200).json({ message: "Data streaming closed" });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ error: "Server error. Please try again" });
+  }
+}
+
 const listCharts = async (req, res) => {
   try {
     let temp = await User.findOne({ userId: req.user.userId }).lean();
@@ -97,6 +102,7 @@ const readInflux = async (req, res) => {
 };
 module.exports = {
   createChart,
+  closeRunzChart,
   listCharts,
   readInflux,
 };
