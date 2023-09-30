@@ -30,7 +30,7 @@ const startConnect = async (runzid, valuesHeaders) => {
       const data = JSON.parse(message);
       switch (data.type) {
         case "start":
-          const intervalId = setInterval(async () => {
+          /* const intervalId = setInterval(async () => { */
             await writeDataToInflux(client, org, bucket, runzid, valuesHeaders);
             const queryApi = client.getQueryApi(org);
             const fluxQuery = `from(bucket:"my-bucket") |> range(start: -1d)|> last()`;
@@ -47,15 +47,15 @@ const startConnect = async (runzid, valuesHeaders) => {
                 console.log("\\nFinished SUCCESS");
               },
             });
-          }, 6000);
-          intervals.set(runzid, intervalId);
+          /* }, 6000);
+          intervals.set(runzid, intervalId); */
           break;
 
         case "stop":
-          if (intervals.has(runzid)) {
+         /*  if (intervals.has(runzid)) {
             clearInterval(intervals.get(runzid));
             intervals.delete(runzid);
-          }
+          } */
           connectedClients.delete(runzid);
           break;
 
