@@ -33,7 +33,8 @@ const startConnect = async (runzid, valuesHeaders) => {
           const intervalId = setInterval(async () => {
             await writeDataToInflux(client, org, bucket, runzid, valuesHeaders);
             const queryApi = client.getQueryApi(org);
-            const fluxQuery = `from(bucket:"my-bucket") |> range(start: -1d)|> last()`;
+            const fluxQuery = `from(bucket:"my-bucket") |> range(start: -1d)|> filter(fn: (r) => r._measurement == ${runzid})
+            |> last()`;
             queryApi.queryRows(fluxQuery, {
               next(row, tableMeta) {
                 const o = tableMeta.toObject(row);
