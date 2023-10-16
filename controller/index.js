@@ -1,69 +1,66 @@
-const { Point, HttpError } = require("@influxdata/influxdb-client");
 const User = require("../models/User");
-const Chart = require("../models/Chart");
 const { influxDb } = require("../config");
 const WebSocket = require("../index");
+const { from, interval, Subject } = require("rxjs");
+const { map, switchMap, takeUntil } = require("rxjs/operators");
 const connectedClients = new Map();
-const intervals = new Map();
 
-async function writeDataToInflux(client, org, bucket, runzid, headers) {
-  headers.map(async (ele) => {
-    const writeApi = client.getWriteApi(org, bucket);
-    const point1 = new Point(runzid)
-      .tag("title", ele)
-      .floatField("value", 20 + Math.round(100 * Math.random()) / 10);
-    writeApi.writePoint(point1);
-    await writeApi.close();
-  });
-}
-
-const startConnect = async (runzid, valuesHeaders) => {
+const startConnect = async (runzid) => {
   await WebSocket.wssInstancePromise;
   const wss = await WebSocket.wssInstancePromise;
-  const { client, org, bucket } = await influxDb();
-
   wss.on("connection", async (ws) => {
-    connectedClients.set(runzid, ws);
-
+    const stopStream$ = new Subject();
     ws.on("message", async (message) => {
-      console.log(message);
       const data = JSON.parse(message);
       switch (data.type) {
         case "start":
-          const intervalId = setInterval(async () => {
-            await writeDataToInflux(client, org, bucket, runzid, valuesHeaders);
+          try {
+            const { client, org, bucket } = await influxDb();
             const queryApi = client.getQueryApi(org);
             const fluxQuery = `
-from(bucket:"my-bucket")
-  |> range(start: -1d)
-  |> filter(fn: (r) => r._measurement == "${runzid}")
-  |> last()
-`;
-            queryApi.queryRows(fluxQuery, {
-              next(row, tableMeta) {
-                const o = tableMeta.toObject(row);
-                ws.send(JSON.stringify(o, null, 2));
-              },
-              error(error) {
-                console.error(error);
-                console.log("\\nFinished ERROR");
-              },
-              complete() {
-                console.log("\\nFinished SUCCESS");
-              },
+                from(bucket:"${bucket}")
+                  |> range(start: -1m)
+                  |> filter(fn: (r) => r._measurement == "${runzid}")
+                  |> last()
+              `;
+            interval(1000)
+              .pipe(
+                switchMap(() =>
+                  from(queryApi.rows(fluxQuery)).pipe(
+                    map(({ values, tableMeta }) => tableMeta.toObject(values))
+                  )
+                ),
+                takeUntil(stopStream$)
+              )
+              .subscribe({
+                next(o) {
+                  ws.send(JSON.stringify(o, null, 2));
+                },
+                error(e) {
+                  console.error(e);
+                  console.log("\nFinished ERROR");
+                },
+                complete() {
+                  console.log("\nFinished SUCCESS");
+                },
+              });
+            connectedClients.set(runzid, {
+              ws,
             });
-          }, 6000);
-          intervals.set(runzid, intervalId);
-          break;
-
-        case "stop":
-          if (intervals.has(runzid)) {
-            clearInterval(intervals.get(runzid));
-            intervals.delete(runzid);
+          } catch (error) {
+            console.error("ERROR", error);
           }
-          connectedClients.delete(runzid);
           break;
-
+        case "stop":
+          const clientInfo = connectedClients.get(runzid);
+          if (clientInfo) {
+            const { ws } = clientInfo;
+            ws.send(JSON.stringify({ message: "Data streaming stopped" }));
+            ws.close();
+            connectedClients.delete(runzid);
+            stopStream$.next();
+          }
+          break;
         default:
           console.error("Unknown message type:", data.type);
       }
@@ -73,8 +70,8 @@ from(bucket:"my-bucket")
 
 const createChart = async (req, res) => {
   try {
-    const { runzId, values } = req.body;
-    await startConnect(runzId, values);
+    const { runzId } = req.body;
+    await startConnect(runzId);
     return res.status(200).json({ message: "Data streaming started" });
   } catch (error) {
     console.log(error);
